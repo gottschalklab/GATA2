@@ -1,0 +1,154 @@
+---
+title: "Sample comparisons"
+author: "Aaron Francis"
+date: "March, 2024"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: '3'
+    code_folding: show
+---
+
+```{r,echo=FALSE,message=FALSE,warning=FALSE}
+require(knitr)
+knitr::opts_chunk$set(error = T)
+```
+
+## Libraries
+
+```{r, message=FALSE}
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+```
+
+## Read in Data
+
+```{r pressure, echo=FALSE}
+#### inputs:
+sample_compare_dir <- "/ix/djishnu/Aaron_F/morgan_satarupa_RNAseq/AM_Results/20250117/DEG_analysis/IL33_and_fibrosis_and_bleo"
+data_f <- "/ix/djishnu/Aaron_F/morgan_satarupa_RNAseq/AM_Results/20250117/DEG_analysis/IL33/pairwise_Padjust/IL33_GATA2_24_Exp1_vs_IL33_WT_24_Exp1/resultsOrdered_IL33_GATA2_24_Exp1_vs_IL33_WT_24_Exp1.txt"
+deg_list_f <- "/ix/djishnu/Aaron_F/morgan_satarupa_RNAseq/AM_Results/20250117/DEG_analysis/IL33_and_fibrosis_and_bleo/IL33_DEGs_and_fibrosis_and_bleo_UP.txt"
+
+#### start main
+setwd(sample_compare_dir)
+# read in counts
+results <- read.csv(data_f)
+colnames(results)[1] <- "Geneid"
+
+# degs for plotting
+deg_list <- readLines(deg_list_f)
+
+```
+
+## Switch to correct orientation of comparison
+
+```{r}
+switch_reference <- FALSE
+
+if (switch_reference) {
+  results <- results %>%
+    mutate(log2FoldChange = log2FoldChange * -1)
+}
+
+
+```
+
+## format data for plotting
+```{r}
+df <- results
+df$Geneid <- toupper(df$Geneid)
+df <- df[df$Geneid %in% deg_list,]
+# Compute -log10(p-value)
+df$neg_log_p <- -log10(df$padj)
+
+# Define significance thresholds
+logFC_threshold <- 0  # Change threshold for up/down regulation
+pvalue_threshold <- 0.05
+
+# Classify genes into groups
+df <- df %>%
+  mutate(
+    significance = case_when(
+      log2FoldChange > logFC_threshold & padj < pvalue_threshold ~ "Up",
+      log2FoldChange < -logFC_threshold & padj < pvalue_threshold ~ "Down",
+      TRUE ~ "Not Sig"
+    )
+  )
+
+# Select top significant genes for labeling
+# Define the threshold for labeling
+logFC_threshold <- 0  # Adjust if needed
+neg_log_p_threshold <- -log10(0.05)
+
+# Identify genes to label
+df$label <- ifelse(abs(df$log2FoldChange) > logFC_threshold & df$neg_log_p > neg_log_p_threshold, df$Geneid, "")
+
+# # Create a subset of labeled points
+# labeled_df <- df[abs(df$log2FoldChange) > logFC_threshold | df$neg_log_p > neg_log_p_threshold, ]
+
+# add in Arg1
+df <- df %>%
+  mutate(label = case_when(
+    Geneid == "ARG1" ~ Geneid,  # Ensure Arg1 is always labeled
+    label != "" ~ label,        # Keep previous labels
+    TRUE ~ ""                   # Ensure other entries are empty, not NA
+  ))
+
+
+
+```
+
+```{r}
+# Open a square PDF
+pdf("UP_noFC_IL33_GATA2_wrt_WT_volcano_plot.pdf", width = 4, height = 3)
+
+# Calculate symmetric x-axis limits around 0
+max_logFC <- max(df$log2FoldChange, na.rm = TRUE)
+min_logFC <- min(df$log2FoldChange, na.rm = TRUE)
+max_abs_logFC <- max(abs(min_logFC), abs(max_logFC))
+
+# Optional padding for spacing
+padding <- 0.1 * max_abs_logFC
+x_limits <- c(-max_abs_logFC - padding, max_abs_logFC + padding)
+
+# y-axis limit
+y_limits <- c(0, max(df$neg_log_p, na.rm = TRUE))
+
+# Volcano plot
+ggplot(df, aes(x = log2FoldChange, y = neg_log_p, color = significance)) +
+  geom_point(alpha = 0.5, size = 2) +
+  scale_color_manual(values = c("Down" = "blue", "Not Sig" = "gray", "Up" = "red")) +
+  
+  # Label all genes except Arg1
+  geom_text_repel(
+    aes(label = ifelse(label == "Arg1", "", label)), 
+    size = 3, box.padding = 0.3, max.overlaps = 10
+  ) +
+
+  # Manually label Arg1
+  geom_text_repel(
+    data = df %>% filter(Geneid == "Arg1"),
+    aes(label = "ARG1", color = significance),
+    size = 3, nudge_x = 1.5, nudge_y = 1.5,
+    segment.color = "red", segment.size = 0.5
+  ) +
+
+  theme_minimal() +
+  theme(
+    legend.title = element_blank(),
+    legend.position = "right",
+    plot.title = element_text(hjust = 0.5),
+    panel.grid = element_blank(),
+    panel.border = element_blank(),
+    axis.line = element_line()
+  ) +
+  labs(x = "log2FC", y = "-log10(P)", title = "WT vs GATA2") +
+  coord_cartesian(xlim = x_limits, ylim = y_limits)
+
+# Save the plot
+dev.off()
+
+
+```
