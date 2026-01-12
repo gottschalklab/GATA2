@@ -1,10 +1,10 @@
-setwd("/ix/djishnu/Aaron_F/morgan_satarupa_RNAseq/AM_Results/TF_target_analysis")
+setwd("/ix/djishnu/Aaron_F/GATA2_paper/Results/SuppFig3d")
 
 # libraries 
 library("qgraph")
 
 # input
-net_info_f = "GATA2_DEG_Targets_TFinteractors_annotation.csv"
+net_info_f = "/ix/djishnu/Aaron_F/GATA2_paper/Data/network/GATA2_DEG_Targets_TFinteractors_annotation.csv"
 
 # functions:
 # create an edge list from from gene to gene weight matrix
@@ -19,7 +19,7 @@ make_edgelist <- function(weights) {
 net_info <- read.csv(net_info_f, header = TRUE, row.names = 1, check.names = FALSE)
 
 # Drop certain TFs (columns)
-net_info <- net_info[, !(names(net_info) %in% c("STAT3", "CEBPA", "CEBPB", "NR1H3", "FLI1", "KLF4", "IRF8", "FOXO1", "MECOM"))]
+net_info <- net_info[, !(names(net_info) %in% c("STAT3", "CEBPA", "CEBPB", "NR1H3", "FLI1", "KLF4", "IRF8", "FOXO1", "MECOM", "KLF1"))]
 
 # Filter genes (rows) where column 2 == 1
 # Assume column 2 is "fibrosis", or grab it generically:
@@ -48,14 +48,14 @@ edgelist <- make_edgelist(edge_df)
 
 # network formatting 
 color_vec <- ifelse(
-  net_info[common_cols, "metabolism"] == 1, "hotpink", "gray"
+  net_info[common_cols, "metabolism"] == 1, "darkcyan", "gray"
 )
 
 node_colors <- c(rep(c('white'),each=dim(edge_df)[1]),color_vec)
 
 node_shapes <- c(rep(c('diamond'),each=dim(edge_df)[1]),rep(c('circle'),each=dim(edge_df)[2]))
 
-node_sizes <- c(rep(c(2.5),each=dim(edge_df)[1]),rep(c(1),each=dim(edge_df)[2]))
+node_sizes <- c(rep(c(1.5),each=dim(edge_df)[1]),rep(c(.75),each=dim(edge_df)[2]))
 
 node_labels <- c(rownames(edge_df),rep(c(""),each=dim(edge_df)[2]))
 
@@ -63,7 +63,7 @@ edge_color <- '#dbd9d9'
 
 
 # plot network
-pdf("20250325_top6_TF_targets_and_GATA2_DEGs_MetabolismPathway_network.pdf")
+pdf("top5_TF_targets_and_GATA2_DEGs_MetabolismPathway_network.pdf")
 qgraph(edgelist, layout = "spring", directed = FALSE, labels = node_labels, color = node_colors, 
        shape = node_shapes, node.width = node_sizes, node.height = node_sizes, edge.color = edge_color, 
        label.scale = FALSE, label.cex = 0.5)
